@@ -175,6 +175,13 @@ def login(user, password, fake_ip):
     if r1.status_code != 302:
         r1 = attempt_send(cipher_data.hex().encode('ascii'), 'text/plain')
     if r1.status_code != 302:
+        # Try percent-encoding the raw bytes (like PHP's urlencode on a binary string)
+        try:
+            pct = urllib.parse.quote_from_bytes(cipher_data)
+            r1 = attempt_send(pct.encode('ascii'), 'application/x-www-form-urlencoded')
+        except Exception as e:
+            print(f"percent-encode attempt failed: {e}")
+    if r1.status_code != 302:
         print(f"registrations/tokens failed (last status={r1.status_code}). Full response:\nheaders={r1.headers}\ntext={r1.text!r}")
         return 0, 0
 
