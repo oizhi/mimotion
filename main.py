@@ -170,18 +170,18 @@ def login(user, password, fake_ip):
 
     # Try several encodings until we get the expected redirect
     r1 = attempt_send(cipher_data, 'application/octet-stream')
-    if r1.status_code != 302:
+    if r1.status_code not in (302, 303):
         r1 = attempt_send(base64.b64encode(cipher_data), 'application/octet-stream')
-    if r1.status_code != 302:
+    if r1.status_code not in (302, 303):
         r1 = attempt_send(cipher_data.hex().encode('ascii'), 'text/plain')
-    if r1.status_code != 302:
+    if r1.status_code not in (302, 303):
         # Try percent-encoding the raw bytes (like PHP's urlencode on a binary string)
         try:
             pct = urllib.parse.quote_from_bytes(cipher_data)
             r1 = attempt_send(pct.encode('ascii'), 'application/x-www-form-urlencoded')
         except Exception as e:
             print(f"percent-encode attempt failed: {e}")
-    if r1.status_code != 302:
+    if r1.status_code not in (302, 303):
         # Try raw bytes with the original form content-type including charset
         r1 = attempt_send(cipher_data, 'application/x-www-form-urlencoded; charset=UTF-8')
     if r1.status_code != 302:
@@ -194,7 +194,7 @@ def login(user, password, fake_ip):
         print(f"response headers: {r.headers}")
         print(f"response body (repr, first 200 bytes): {repr(r.content[:200])}")
         r1 = r
-    if r1.status_code != 302:
+    if r1.status_code not in (302, 303):
         print(f"registrations/tokens failed (last status={r1.status_code}). Full response:\nheaders={r1.headers}\ntext={r1.text!r}")
         return 0, 0
 
@@ -242,8 +242,8 @@ def login(user, password, fake_ip):
     r2_resp = requests.post(url2, data=data2, headers=headers)
     try:
         r2 = r2_resp.json()
-    except ValueError:
-        print(f"login() returned non-JSON response: status={r2_resp.status_code}, text={r2_resp.text!r}")
+    except Exception as e:
+        print(f"login() returned non-JSON response: status={r2_resp.status_code}, text={r2_resp.text!r}, error={e}")
         return 0, 0
     try:
         login_token = r2["token_info"]["login_token"]
@@ -254,7 +254,7 @@ def login(user, password, fake_ip):
     return login_token, userid
 
 def get_access_token(location):
-    code_pattern = re.compile("(?<=access=).*?(?=&)")
+    code_pattern = re.compile("(?<=access=).*?(?=&|$)")
     result = code_pattern.findall(location)
     if result is None or len(result) == 0:
         return None
