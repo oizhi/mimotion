@@ -207,6 +207,7 @@ def login(user, password, fake_ip):
         if code is None:
             print("获取accessToken失败")
             return 0, 0
+        print(f"[DEBUG] Extracted access token (first 50 chars): {code[:50]}...")
     except Exception as e:
         print(f"获取accessToken异常: {e}")
         return 0, 0
@@ -239,11 +240,16 @@ def login(user, password, fake_ip):
             "source": "com.xiaomi.hm.health",
             "third_name": "email",
         }
+    print(f"[DEBUG] Posting to account.huami.com with data keys: {list(data2.keys())}")
+    print(f"[DEBUG] Data code value (first 50 chars): {data2.get('code', 'N/A')[:50]}...")
     r2_resp = requests.post(url2, data=data2, headers=headers)
+    print(f"[DEBUG] account.huami.com response status: {r2_resp.status_code}")
+    print(f"[DEBUG] account.huami.com response headers: {r2_resp.headers}")
     try:
         r2 = r2_resp.json()
     except Exception as e:
         print(f"login() returned non-JSON response: status={r2_resp.status_code}, text={r2_resp.text!r}, error={e}")
+        print(f"[DEBUG] Response content (hex, first 100 bytes): {r2_resp.content[:100].hex()}")
         return 0, 0
     try:
         login_token = r2["token_info"]["login_token"]
