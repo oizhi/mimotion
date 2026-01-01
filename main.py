@@ -184,7 +184,7 @@ def login(user, password, fake_ip):
     if r1.status_code not in (302, 303):
         # Try raw bytes with the original form content-type including charset
         r1 = attempt_send(cipher_data, 'application/x-www-form-urlencoded; charset=UTF-8')
-    if r1.status_code != 302:
+    if r1.status_code not in (302, 303):
         # Finally, try sending without setting Content-Type (let requests decide)
         h = headers.copy()
         if 'content-type' in h:
