@@ -11,6 +11,7 @@ import pytz
 import urllib
 import requests
 from Crypto.Cipher import AES
+import base64
 
 # 获取区域天气情况
 def get_factor_by_weather(area):
@@ -157,9 +158,15 @@ def login(user, password, fake_ip):
     plaintext = query.encode('utf-8')
     # 执行请求加密
     cipher_data = encrypt_data(plaintext)
-
     url1 = 'https://api-user.zepp.com/v2/registrations/tokens'
-    r1 = requests.post(url1, data=cipher_data, headers=headers, allow_redirects=False)
+    # The server expects the encrypted payload in a binary-safe encoding.
+    # Base64-encode the AES-CBC output and send as octet-stream for this endpoint.
+    b64_cipher = base64.b64encode(cipher_data)
+    headers_r1 = headers.copy()
+    headers_r1['content-type'] = 'application/octet-stream'
+    r1 = requests.post(url1, data=b64_cipher, headers=headers_r1, allow_redirects=False)
+    if r1.status_code != 302:
+        print(f"registrations/tokens returned status={r1.status_code}, text={r1.text!r}")
     location = r1.headers["Location"]
     try:
         code = get_access_token(location)
