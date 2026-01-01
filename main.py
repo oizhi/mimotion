@@ -103,9 +103,15 @@ def execute(user, password, min_step, max_step):
 
     data = f'userid={userid}&last_sync_data_time=1597306380&device_type=0&last_deviceid=DA932FFFFE8816E7&data_json={data_json}'
 
-    response = requests.post(url, data=data, headers=head).json()
-    print(f"修改步数（{step}）[" + response['message'] + "]")
-    print(f"账号：{user[:3]}****{user[7:]}\n修改步数（{step}）[" + response['message'] + "]\n")
+    resp = requests.post(url, data=data, headers=head)
+    try:
+        response = resp.json()
+    except ValueError:
+        print(f"提交修改步数时返回非JSON: status={resp.status_code}, text={resp.text!r}")
+        return False
+    msg = response.get('message')
+    print(f"修改步数（{step}）[{msg}]")
+    print(f"账号：{user[:3]}****{user[7:]}\n修改步数（{step}）[{msg}]\n")
     return True
 
 
@@ -192,9 +198,18 @@ def login(user, password, fake_ip):
             "source": "com.xiaomi.hm.health",
             "third_name": "email",
         }
-    r2 = requests.post(url2, data=data2, headers=headers).json()
-    login_token = r2["token_info"]["login_token"]
-    userid = r2["token_info"]["user_id"]
+    r2_resp = requests.post(url2, data=data2, headers=headers)
+    try:
+        r2 = r2_resp.json()
+    except ValueError:
+        print(f"login() returned non-JSON response: status={r2_resp.status_code}, text={r2_resp.text!r}")
+        return 0, 0
+    try:
+        login_token = r2["token_info"]["login_token"]
+        userid = r2["token_info"]["user_id"]
+    except Exception as e:
+        print(f"login() unexpected JSON structure: {e}, json={r2}")
+        return 0, 0
     return login_token, userid
 
 def get_access_token(location):
@@ -208,7 +223,15 @@ def get_access_token(location):
 def get_app_token(login_token, fake_ip):
     url = f"https://account-cn.huami.com/v1/client/app_tokens?app_name=com.xiaomi.hm.health&dn=api-user.huami.com%2Capi-mifit.huami.com%2Capp-analytics.huami.com&login_token={login_token}"
     headers = {'User-Agent': 'MiFit/5.3.0 (iPhone; iOS 14.7.1; Scale/3.00)', 'X-Forwarded-For': fake_ip}
-    response = requests.get(url, headers=headers).json()
+    resp = requests.get(url, headers=headers)
+    try:
+        response = resp.json()
+    except ValueError:
+        print(f"get_app_token returned non-JSON response: status={resp.status_code}, text={resp.text!r}")
+        return None
+    if 'token_info' not in response or 'app_token' not in response['token_info']:
+        print(f"get_app_token missing app_token in response: {response}")
+        return None
     app_token = response['token_info']['app_token']
     return app_token
 
