@@ -159,15 +159,29 @@ def login(user, password, fake_ip):
     # 执行请求加密
     cipher_data = encrypt_data(plaintext)
     url1 = 'https://api-user.zepp.com/v2/registrations/tokens'
-    # The server expects the encrypted payload in a binary-safe encoding.
-    # Base64-encode the AES-CBC output and send as octet-stream for this endpoint.
-    b64_cipher = base64.b64encode(cipher_data)
-    headers_r1 = headers.copy()
-    headers_r1['content-type'] = 'application/octet-stream'
-    r1 = requests.post(url1, data=b64_cipher, headers=headers_r1, allow_redirects=False)
+    def attempt_send(body, content_type):
+        h = headers.copy()
+        h['content-type'] = content_type
+        r = requests.post(url1, data=body, headers=h, allow_redirects=False)
+        print(f"registrations/tokens tried content-type={content_type}, status={r.status_code}")
+        print(f"response headers: {r.headers}")
+        print(f"response body (repr, first 200 bytes): {repr(r.content[:200])}")
+        return r
+
+    # Try several encodings until we get the expected redirect
+    r1 = attempt_send(cipher_data, 'application/octet-stream')
     if r1.status_code != 302:
-        print(f"registrations/tokens returned status={r1.status_code}, text={r1.text!r}")
-    location = r1.headers["Location"]
+        r1 = attempt_send(base64.b64encode(cipher_data), 'application/octet-stream')
+    if r1.status_code != 302:
+        r1 = attempt_send(cipher_data.hex().encode('ascii'), 'text/plain')
+    if r1.status_code != 302:
+        print(f"registrations/tokens failed (last status={r1.status_code}). Full response:\nheaders={r1.headers}\ntext={r1.text!r}")
+        return 0, 0
+
+    location = r1.headers.get("Location")
+    if not location:
+        print("registrations/tokens did not return a Location header; headers:", r1.headers)
+        return 0, 0
     try:
         code = get_access_token(location)
         if code is None:
