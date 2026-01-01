@@ -182,6 +182,19 @@ def login(user, password, fake_ip):
         except Exception as e:
             print(f"percent-encode attempt failed: {e}")
     if r1.status_code != 302:
+        # Try raw bytes with the original form content-type including charset
+        r1 = attempt_send(cipher_data, 'application/x-www-form-urlencoded; charset=UTF-8')
+    if r1.status_code != 302:
+        # Finally, try sending without setting Content-Type (let requests decide)
+        h = headers.copy()
+        if 'content-type' in h:
+            h.pop('content-type')
+        r = requests.post(url1, data=cipher_data, headers=h, allow_redirects=False)
+        print(f"registrations/tokens tried no Content-Type header, status={r.status_code}")
+        print(f"response headers: {r.headers}")
+        print(f"response body (repr, first 200 bytes): {repr(r.content[:200])}")
+        r1 = r
+    if r1.status_code != 302:
         print(f"registrations/tokens failed (last status={r1.status_code}). Full response:\nheaders={r1.headers}\ntext={r1.text!r}")
         return 0, 0
 
