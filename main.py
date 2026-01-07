@@ -51,6 +51,16 @@ def encrypt_data(plain: bytes) -> bytes:
     padded = plain + bytes([pad_len]) * pad_len
     return cipher.encrypt(padded)
 
+# 解密响应数据
+def decrypt_data(cipher_text: bytes) -> bytes:
+    key = b'xeNtBVqzDc6tuNTh'  # 16 bytes
+    iv = b'MAAAYAAAAAAAAABg'  # 16 bytes
+    cipher = AES.new(key, AES.MODE_CBC, iv)
+    decrypted = cipher.decrypt(cipher_text)
+    # 移除 PKCS#7 填充
+    pad_len = decrypted[-1]
+    return decrypted[:-pad_len]
+
 # 获取当前时间对应的最大和最小步数
 def get_step_by_time(beijing_time, factor):
     hour = beijing_time.hour
@@ -245,12 +255,26 @@ def login(user, password, fake_ip):
     r2_resp = requests.post(url2, data=data2, headers=headers)
     print(f"[DEBUG] account.huami.com response status: {r2_resp.status_code}")
     print(f"[DEBUG] account.huami.com response headers: {r2_resp.headers}")
-    try:
-        r2 = r2_resp.json()
-    except Exception as e:
-        print(f"login() returned non-JSON response: status={r2_resp.status_code}, text={r2_resp.text!r}, error={e}")
-        print(f"[DEBUG] Response content (hex, first 100 bytes): {r2_resp.content[:100].hex()}")
-        return 0, 0
+    
+    # 检查响应是否为加密数据
+    content_type = r2_resp.headers.get('Content-Type', '')
+    if 'application/octet-stream' in content_type or r2_resp.status_code == 400:
+        try:
+            # 尝试解密响应
+            decrypted = decrypt_data(r2_resp.content)
+            print(f"[DEBUG] Decrypted response: {decrypted[:200]}")
+            r2 = json.loads(decrypted.decode('utf-8'))
+        except Exception as e:
+            print(f"login() failed to decrypt response: status={r2_resp.status_code}, error={e}")
+            print(f"[DEBUG] Response content (hex, first 100 bytes): {r2_resp.content[:100].hex()}")
+            return 0, 0
+    else:
+        try:
+            r2 = r2_resp.json()
+        except Exception as e:
+            print(f"login() returned non-JSON response: status={r2_resp.status_code}, text={r2_resp.text!r}, error={e}")
+            print(f"[DEBUG] Response content (hex, first 100 bytes): {r2_resp.content[:100].hex()}")
+            return 0, 0
     try:
         login_token = r2["token_info"]["login_token"]
         userid = r2["token_info"]["user_id"]
