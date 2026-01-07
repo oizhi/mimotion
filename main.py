@@ -252,7 +252,15 @@ def login(user, password, fake_ip):
         }
     print(f"[DEBUG] Posting to account.huami.com with data keys: {list(data2.keys())}")
     print(f"[DEBUG] Data code value (first 50 chars): {data2.get('code', 'N/A')[:50]}...")
-    r2_resp = requests.post(url2, data=data2, headers=headers)
+    
+    # 对请求数据进行加密
+    data2_query = urllib.parse.urlencode(data2)
+    data2_encrypted = encrypt_data(data2_query.encode('utf-8'))
+    
+    # 使用加密数据发送请求
+    headers2 = headers.copy()
+    headers2['content-type'] = 'application/x-www-form-urlencoded; charset=UTF-8'
+    r2_resp = requests.post(url2, data=data2_encrypted, headers=headers2)
     print(f"[DEBUG] account.huami.com response status: {r2_resp.status_code}")
     print(f"[DEBUG] account.huami.com response headers: {r2_resp.headers}")
     
